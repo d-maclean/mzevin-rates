@@ -18,14 +18,12 @@ import itertools
 import importlib
 import glob
 from tqdm import tqdm
+import pdb
 from IPython.core.debugger import set_trace
-
-from cosmic.sample.initialbinarytable import InitialBinaryTable
-from cosmic.evolve import Evolve
 
 
 # set free parameters in the model
-Zsun = 0.014 #Solar metallicity from Asplund et al. 2009
+Zsun = 0.017 #Solar metallicity
 lowZ = 0.0001 #lower bound on metallicity
 highZ = 0.03 #upper bound on metallicity
 sigmaZ = 0.5 #sigma of the lognormal distribution about the mean metallicity
@@ -76,7 +74,7 @@ def metal_disp_z(z, Z, sigma_Z=sigmaZ, lowZ=lowZ, highZ=highZ):
     return density
 
 
-def fmerge_at_z(model, zbin_low, zbin_high, cbc_type, zmerge_min=0, zmerge_max=0.1):
+def fmerge_at_z(model, zbin_low, zbin_high, cosmic=False, cbc_type=None, zmerge_min=0, zmerge_max=0.1):
     """
     Calculates the number of mergers of a particular CBC type per unit mass
     N_cor,i = f_bin f_IMF N_merger,i / Mtot,sim
@@ -93,11 +91,14 @@ def fmerge_at_z(model, zbin_low, zbin_high, cbc_type, zmerge_min=0, zmerge_max=0
     met_weights = []
 
     for met in sorted(model.keys()):
-        bpp = model[met][cbc_type]
-        mass_stars = model[met]['mass_stars']
 
-        # get delay times for all merging binaries (merger happens at evol_type=6)
-        merger = bpp.loc[bpp['evol_type']==6]
+        mass_stars = model[met]['mass_stars']
+        if cosmic:
+            bpp = model[met][cbc_type]
+            # get delay times for all merging binaries (merger happens at evol_type=6)
+            merger = bpp.loc[bpp['evol_type']==6]
+        else:
+            merger = model[met]['mergers']
 
         # get the fraction of systems born between [zlow,zhigh] that merger between [zmerge_min,zmerge_max]
         if zbin_low==0:
@@ -107,7 +108,12 @@ def fmerge_at_z(model, zbin_low, zbin_high, cbc_type, zmerge_min=0, zmerge_max=0
         else:
             tdelay_min = (cosmo.lookback_time(zbin_low) - cosmo.lookback_time(zmerge_max)).to(u.Myr).value
             tdelay_max = (cosmo.lookback_time(zbin_high) - cosmo.lookback_time(zmerge_min)).to(u.Myr).value
-        Nmerge_zbin = len(merger.loc[(merger['tphys']<=tdelay_max) & (merger['tphys']>tdelay_min)])
+
+        if cosmic:
+            Nmerge_zbin = len(merger.loc[(merger['tphys']<=tdelay_max) & (merger['tphys']>tdelay_min)])
+        else:
+            Nmerge_zbin = len(merger.loc[(merger['t_delay']<=tdelay_max) & (merger['t_delay']>tdelay_min)])
+            
 
         # get the number of mergers per unit mass
         f_merge.append(float(Nmerge_zbin) / mass_stars)
@@ -116,7 +122,7 @@ def fmerge_at_z(model, zbin_low, zbin_high, cbc_type, zmerge_min=0, zmerge_max=0
         midz = 10**(np.log10(zbin_low) + (np.log10(zbin_high)-np.log10(zbin_low))/2.0)
 
         # append the relative weight of this metallicity at this particular redshift
-        met_weights.append(metal_disp_z(midz, float('0.'+met[1:])))
+        met_weights.append(metal_disp_z(midz, met))
 
     # normalize metallicity weights so that they sum to unity
     met_weights = np.asarray(met_weights)/np.sum(met_weights)
@@ -125,7 +131,7 @@ def fmerge_at_z(model, zbin_low, zbin_high, cbc_type, zmerge_min=0, zmerge_max=0
     return np.sum(np.asarray(f_merge)*met_weights)*u.Msun**(-1)
 
 
-def local_rate(model, zmin, zmax, cbc_type, zmerge_min=0, zmerge_max=0.1, N_zbins=100):
+def local_rate(model, zmin, zmax, cosmic=False, cbc_type=None, zmerge_min=0, zmerge_max=0.1, N_zbins=100):
     """
     Calculates the local merger rate, i.e. mergers that occur between zmerge_min and zmerge_max
     """
@@ -138,7 +144,7 @@ def local_rate(model, zmin, zmax, cbc_type, zmerge_min=0, zmerge_max=0.1, N_zbin
     # work down from highest zbin
     for zbin_low, zbin_high in tqdm(zip(zbins[::-1][1:], zbins[::-1][:-1]), total=len(zbins)-1):
         # get local mergers per unit mass
-        floc = fmerge_at_z(model, zbin_low, zbin_high, cbc_type, zmerge_min=zmerge_min, zmerge_max=zmerge_max)
+        floc = fmerge_at_z(model, zbin_low, zbin_high, cosmic, cbc_type, zmerge_min=zmerge_min, zmerge_max=zmerge_max)
         # get redshift at middle of the log-spaced zbin
         midz = 10**(np.log10(zbin_low) + (np.log10(zbin_high)-np.log10(zbin_low))/2.0)
         # get SFR at this redshift
