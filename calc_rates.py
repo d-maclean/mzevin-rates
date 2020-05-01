@@ -22,7 +22,7 @@ import rate_functions
 zmin = 0 #lowest redshift we are considering
 zmax = 15 #highest redshift we are considering
 local_z = 0.1 #max redshift of mergers in the "local" universe
-N_zbins = 10000
+N_zbins = 1000
 
 # --- Argument handling --- #
 argp = argparse.ArgumentParser()
