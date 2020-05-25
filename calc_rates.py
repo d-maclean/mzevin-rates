@@ -43,7 +43,7 @@ if args.cosmic:
         dat_file = [item for item in cosmic_files if (item.startswith('dat')) and (item.endswith('.h5'))][0]
         model[float(met)] = {}
         bpp = pd.read_hdf(os.path.join(mdl_path,met,dat_file), key='bpp')
-        if pessimistic:
+        if args.pessimistic:
             bpp = rate_functions.filter_optimistic_bpp(bpp)
 
         bbh_idxs = bpp.loc[(bpp['kstar_1']==14) & (bpp['kstar_2']==14)].index.unique()
