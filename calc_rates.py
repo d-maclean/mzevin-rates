@@ -21,13 +21,14 @@ import rate_functions
 # set free parameters in the model
 zmin = 0 #lowest redshift we are considering
 zmax = 15 #highest redshift we are considering
-local_z = 0.1 #max redshift of mergers in the "local" universe
-N_zbins = 1000
+local_z = 0.01 #max redshift of mergers in the "local" universe
+N_zbins = 10000
 
 # --- Argument handling --- #
 argp = argparse.ArgumentParser()
 argp.add_argument("-p", "--population", type=str, help="Path to the population you wish to calculate rates for. If --cosmic is set, it will assume the runs are saved in the standard COSMIC output with subdirectories for each metallicity run. Otherwise, will expect an hdf file with key 'model' that is a dataframe which includes 't_delay', 'met', and 'mass_per_Z'.")
 argp.add_argument("--cosmic", action="store_true", help='Specifies whether to expect COSMIC dat files. Default=False')
+argp.add_argument("--pessimistic", action="store_true", help="Specifies whether to filter bpp arrays using the 'pessimistic' CE scenario. Default=False")
 args = argp.parse_args()
 
 # read in pop model, save the metallicities that are specified. 
@@ -42,6 +43,8 @@ if args.cosmic:
         dat_file = [item for item in cosmic_files if (item.startswith('dat')) and (item.endswith('.h5'))][0]
         model[float(met)] = {}
         bpp = pd.read_hdf(os.path.join(mdl_path,met,dat_file), key='bpp')
+        if pessimistic:
+            bpp = rate_functions.filter_optimistic_bpp(bpp)
 
         bbh_idxs = bpp.loc[(bpp['kstar_1']==14) & (bpp['kstar_2']==14)].index.unique()
         model[float(met)]['bbh'] = bpp.loc[bbh_idxs]
