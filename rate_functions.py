@@ -24,8 +24,8 @@ from IPython.core.debugger import set_trace
 
 # set free parameters in the model
 Zsun = 0.017 #Solar metallicity
-lowZ = 0.0001 #lower bound on metallicity
-highZ = 0.03 #upper bound on metallicity
+lowZ = Zsun/200 #lower bound on metallicity
+highZ = 2*Zsun #upper bound on metallicity
 sigmaZ = 0.5 #sigma of the lognormal distribution about the mean metallicity
 
 
