@@ -73,19 +73,6 @@ def metal_disp_z(z, Z, sigma_Z=sigmaZ, lowZ=lowZ, highZ=highZ):
 
     return density
 
-def filter_optimistic_bpp(bpp, pessimistic_merge=[0,1,2,7,8,10,11,12]):
-    CE = bpp.loc[bpp['evol_type']==7]
-    # check which one is the donor
-    CE_star1donor =  CE.loc[CE['RRLO_1']>=CE['RRLO_2']]
-    CE_star2donor =  CE.loc[CE['RRLO_1']<CE['RRLO_2']]
-    # Get the ones that would merge
-    CE_merge_star1donor = CE_star1donor.loc[CE_star1donor['kstar_1'].isin(pessimistic_merge)].index.unique()
-    CE_merge_star2donor = CE_star2donor.loc[CE_star2donor['kstar_2'].isin(pessimistic_merge)].index.unique()
-    # drop these
-    bpp_cut = bpp.drop(CE_merge_star1donor)
-    bpp_cut = bpp.drop(CE_merge_star2donor)
-    return bpp_cut
-
 
 def fmerge_at_z(model, zbin_low, zbin_high, cosmic=False, cbc_type=None, zmerge_min=0, zmerge_max=0.1):
     """

@@ -17,6 +17,7 @@ from tqdm import tqdm
 from IPython.core.debugger import set_trace
 
 import rate_functions
+import filters
 
 # set free parameters in the model
 zmin = 0 #lowest redshift we are considering
@@ -29,6 +30,7 @@ argp = argparse.ArgumentParser()
 argp.add_argument("-p", "--population", type=str, help="Path to the population you wish to calculate rates for. If --cosmic is set, it will assume the runs are saved in the standard COSMIC output with subdirectories for each metallicity run. Otherwise, will expect an hdf file with key 'model' that is a dataframe which includes 't_delay', 'met', and 'mass_per_Z'.")
 argp.add_argument("--cosmic", action="store_true", help='Specifies whether to expect COSMIC dat files. Default=False')
 argp.add_argument("--pessimistic", action="store_true", help="Specifies whether to filter bpp arrays using the 'pessimistic' CE scenario. Default=False")
+argp.add_argument("--filter", type=str, help="Specify filtering scheme to get rates from a specified subset of the population. Filters are coded up in the 'filters.py' function. Default=None")
 args = argp.parse_args()
 
 # read in pop model, save the metallicities that are specified. 
@@ -42,24 +44,44 @@ if args.cosmic:
         cosmic_files = os.listdir(os.path.join(mdl_path,met))
         dat_file = [item for item in cosmic_files if (item.startswith('dat')) and (item.endswith('.h5'))][0]
         model[float(met)] = {}
-        bpp = pd.read_hdf(os.path.join(mdl_path,met,dat_file), key='bpp')
-        if args.pessimistic:
-            bpp = rate_functions.filter_optimistic_bpp(bpp)
 
-        bbh_idxs = bpp.loc[(bpp['kstar_1']==14) & (bpp['kstar_2']==14)].index.unique()
-        model[float(met)]['bbh'] = bpp.loc[bbh_idxs]
-        nsbh_idxs = bpp.loc[((bpp['kstar_1']==13) & (bpp['kstar_2']==14)) | ((bpp['kstar_1']==14) & (bpp['kstar_2']==13))].index.unique()
-        model[float(met)]['nsbh'] = bpp.loc[nsbh_idxs]
-        bns_idxs = bpp.loc[(bpp['kstar_1']==13) & (bpp['kstar_2']==13)].index.unique()
-        model[float(met)]['bns'] = bpp.loc[bns_idxs]
-
+        # get total stellar mass sampled
         model[float(met)]['mass_stars'] = float(pd.read_hdf(os.path.join(mdl_path,met,dat_file), key='mass_stars').iloc[-1])
 
+        # read in bpp array
+        bpp = pd.read_hdf(os.path.join(mdl_path,met,dat_file), key='bpp')
+
+        # filter to get pessimistic CE, if specified
+        if args.pessimistic:
+            bpp = filters.pessimistic_CE(bpp)
+
+        # see if specific filters are provided
+        if args.filter:
+            if args.filter not in filters._valid_filters:
+                raise ValueError('The filter you specified ({}) is not defined in the filters function!'.format(args.filter))
+            filter_func  = filters._valid_filters[args.filter]
+            model[float(met)][args.filter] = filter_func[bpp[
+            cbc_classes = [filter]
+            
+
+        # otherwise, just get the BBH, NSBH, and BNS rates
+        else:
+            bbh_idxs = bpp.loc[(bpp['kstar_1']==14) & (bpp['kstar_2']==14)].index.unique()
+            model[float(met)]['bbh'] = bpp.loc[bbh_idxs]
+            nsbh_idxs = bpp.loc[((bpp['kstar_1']==13) & (bpp['kstar_2']==14)) | ((bpp['kstar_1']==14) & (bpp['kstar_2']==13))].index.unique()
+            model[float(met)]['nsbh'] = bpp.loc[nsbh_idxs]
+            bns_idxs = bpp.loc[(bpp['kstar_1']==13) & (bpp['kstar_2']==13)].index.unique()
+            model[float(met)]['bns'] = bpp.loc[bns_idxs]
+
+
+            cbc_classes =  ['bbh','nsbh','bns']
+
     #  Calculate rates
-    for cbc in ['bbh','nsbh','bns']:
+    for cbc in cbc_classes:
         R,_,_ = rate_functions.local_rate(model, zmin, zmax, cosmic=True, cbc_type=cbc, zmerge_min=0, zmerge_max=local_z, N_zbins=N_zbins)
         print("{} rate: {} Gpc^-3 yr^-1".format(cbc,np.round(R.value,2)))
 
+# do for general population
 else:
     df = pd.read_hdf(mdl_path, key='model')
     for met in df['met'].unique():
