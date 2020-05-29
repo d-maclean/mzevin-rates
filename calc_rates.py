@@ -56,7 +56,7 @@ if args.cosmic:
             bpp = filters.pessimistic_CE(bpp)
 
         # filters the bpp array for specified populations
-        for filt in args.filter:
+        for filt in args.filters:
             if filt not in filters._valid_filters:
                 raise ValueError('The filter you specified ({}) is not defined in the filters function!'.format(filt))
             filter_func  = filters._valid_filters[filt]
