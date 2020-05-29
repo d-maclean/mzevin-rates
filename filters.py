@@ -14,6 +14,23 @@ def pessimistic_CE(bpp, pessimistic_merge=[0,1,2,7,8,10,11,12]):
     bpp_cut = bpp.drop(CE_merge_star2donor)
     return bpp_cut
 
+def bbh_filter(bpp):
+    bbh_idxs = bpp.loc[(bpp['kstar_1']==14) & (bpp['kstar_2']==14)].index.unique()
+    bpp_cut = bpp.loc[bbh_idxs]
+    return bpp_cut
+
+def nsbh_filter(bpp):
+    nsbh_idxs = bpp.loc[((bpp['kstar_1']==13) & (bpp['kstar_2']==14)) |\
+         ((bpp['kstar_1']==14) & (bpp['kstar_2']==13))].index.unique()
+    bpp_cut = bpp.loc[nsbh_idxs]
+    return bpp_cut
+
+def bns_filter(bpp):
+    bns_idxs = bpp.loc[(bpp['kstar_1']==13) & (bpp['kstar_2']==13)].index.unique()
+    bpp_cut = bpp.loc[bns_idxs]
+    return bpp_cut
+
+
 def gw190814(bpp):
     q_range = (0.112-0.009, 0.112+0.008)
     Mtot_range = (25.8-0.9, 25.8+1.0)
@@ -68,6 +85,9 @@ def gw190814_coarse(bpp):
     return bpp_cut
 
 _valid_filters = {'pessimistic_CE': pessimistic_CE, \
+                  'bbh': bbh_filter, \
+                  'nsbh': nsbh_filter, \
+                  'bns': bns_filter, \
                   'gw190814': gw190814, \
                   'gw190814_approx': gw190814_approx, \
                   'gw190814_coarse': gw190814_coarse}

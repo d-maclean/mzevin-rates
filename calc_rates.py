@@ -30,7 +30,7 @@ argp = argparse.ArgumentParser()
 argp.add_argument("-p", "--population", type=str, help="Path to the population you wish to calculate rates for. If --cosmic is set, it will assume the runs are saved in the standard COSMIC output with subdirectories for each metallicity run. Otherwise, will expect an hdf file with key 'model' that is a dataframe which includes 't_delay', 'met', and 'mass_per_Z'.")
 argp.add_argument("--cosmic", action="store_true", help='Specifies whether to expect COSMIC dat files. Default=False')
 argp.add_argument("--pessimistic", action="store_true", help="Specifies whether to filter bpp arrays using the 'pessimistic' CE scenario. Default=False")
-argp.add_argument("--filter", type=str, help="Specify filtering scheme to get rates from a specified subset of the population. Filters are coded up in the 'filters.py' function. Default=None")
+argp.add_argument("--filters", nargs="+", default=['bbh','nsbh','bns'], help="Specify filtering scheme(s) to get rates from a specified subset of the population. Filters are coded up in the 'filters.py' function.")
 args = argp.parse_args()
 
 # read in pop model, save the metallicities that are specified.
@@ -55,25 +55,13 @@ if args.cosmic:
         if args.pessimistic:
             bpp = filters.pessimistic_CE(bpp)
 
-        # see if specific filters are provided
-        if args.filter:
-            if args.filter not in filters._valid_filters:
-                raise ValueError('The filter you specified ({}) is not defined in the filters function!'.format(args.filter))
-            filter_func  = filters._valid_filters[args.filter]
-            model[float(met)][args.filter] = filter_func(bpp)
-            cbc_classes = [args.filter]
-
-
-        # otherwise, just get the BBH, NSBH, and BNS rates
-        else:
-            bbh_idxs = bpp.loc[(bpp['kstar_1']==14) & (bpp['kstar_2']==14)].index.unique()
-            model[float(met)]['bbh'] = bpp.loc[bbh_idxs]
-            nsbh_idxs = bpp.loc[((bpp['kstar_1']==13) & (bpp['kstar_2']==14)) | ((bpp['kstar_1']==14) & (bpp['kstar_2']==13))].index.unique()
-            model[float(met)]['nsbh'] = bpp.loc[nsbh_idxs]
-            bns_idxs = bpp.loc[(bpp['kstar_1']==13) & (bpp['kstar_2']==13)].index.unique()
-            model[float(met)]['bns'] = bpp.loc[bns_idxs]
-
-            cbc_classes =  ['bbh','nsbh','bns']
+        # filters the bpp array for specified populations
+        for filt in args.filter:
+            if filt not in filters._valid_filters:
+                raise ValueError('The filter you specified ({}) is not defined in the filters function!'.format(filt))
+            filter_func  = filters._valid_filters[filt]
+            model[float(met)][filt] = filter_func(bpp)
+            cbc_classes = [filt]
 
     #  Calculate rates
     for cbc in cbc_classes:
