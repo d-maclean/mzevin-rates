@@ -33,7 +33,7 @@ argp.add_argument("--pessimistic", action="store_true", help="Specifies whether 
 argp.add_argument("--filter", type=str, help="Specify filtering scheme to get rates from a specified subset of the population. Filters are coded up in the 'filters.py' function. Default=None")
 args = argp.parse_args()
 
-# read in pop model, save the metallicities that are specified. 
+# read in pop model, save the metallicities that are specified.
 mdl_path = args.population
 model = {}
 
@@ -60,9 +60,9 @@ if args.cosmic:
             if args.filter not in filters._valid_filters:
                 raise ValueError('The filter you specified ({}) is not defined in the filters function!'.format(args.filter))
             filter_func  = filters._valid_filters[args.filter]
-            model[float(met)][args.filter] = filter_func[bpp[
-            cbc_classes = [filter]
-            
+            model[float(met)][args.filter] = filter_func(bpp)
+            cbc_classes = [args.filter]
+
 
         # otherwise, just get the BBH, NSBH, and BNS rates
         else:
@@ -73,13 +73,12 @@ if args.cosmic:
             bns_idxs = bpp.loc[(bpp['kstar_1']==13) & (bpp['kstar_2']==13)].index.unique()
             model[float(met)]['bns'] = bpp.loc[bns_idxs]
 
-
             cbc_classes =  ['bbh','nsbh','bns']
 
     #  Calculate rates
     for cbc in cbc_classes:
         R,_,_ = rate_functions.local_rate(model, zmin, zmax, cosmic=True, cbc_type=cbc, zmerge_min=0, zmerge_max=local_z, N_zbins=N_zbins)
-        print("{} rate: {} Gpc^-3 yr^-1".format(cbc,np.round(R.value,2)))
+        print("{} rate: {:0.2E} Gpc^-3 yr^-1".format(cbc,R.value))
 
 # do for general population
 else:
@@ -96,5 +95,5 @@ else:
 
     # Calculate rates
     R,_,_ = rate_functions.local_rate(model, zmin, zmax, cosmic=False, cbc_type=None, zmerge_min=0, zmerge_max=local_z, N_zbins=N_zbins)
-    print("rate: {} Gpc^-3 yr^-1".format(np.round(R.value,2)))
-    
+    print("rate: {:0.2E} Gpc^-3 yr^-1".format(R.value))
+

@@ -25,8 +25,9 @@ def gw190814(bpp):
                     np.max([np.asarray(cbs['mass_2']),np.asarray(cbs['mass_1'])], axis=0))
     cbs['Mtot'] = np.asarray(cbs['mass_1']) + np.asarray(cbs['mass_2'])
 
-    bpp_cut = cbs.loc[((cbs['q']>=q_range[0]) & (cbs['q']<=q_range[1])) & \
-                ((cbs['Mtot']>=Mtot_range[0]) & (cbs['Mtot']<=Mtot_range[1]))]
+    cut_idxs = cbs.loc[((cbs['q']>=q_range[0]) & (cbs['q']<=q_range[1])) & \
+                ((cbs['Mtot']>=Mtot_range[0]) & (cbs['Mtot']<=Mtot_range[1]))].index.unique()
+    bpp_cut = bpp.loc[cut_idxs]
 
     return bpp_cut
 
@@ -42,8 +43,9 @@ def gw190814_approx(bpp):
                     np.max([np.asarray(cbs['mass_2']),np.asarray(cbs['mass_1'])], axis=0))
     cbs['Mtot'] = np.asarray(cbs['mass_1']) + np.asarray(cbs['mass_2'])
 
-    bpp_cut = cbs.loc[((cbs['q']>=q_range[0]) & (cbs['q']<=q_range[1])) & \
-                ((cbs['Mtot']>=Mtot_range[0]) & (cbs['Mtot']<=Mtot_range[1]))]
+    cut_idxs = cbs.loc[((cbs['q']>=q_range[0]) & (cbs['q']<=q_range[1])) & \
+                ((cbs['Mtot']>=Mtot_range[0]) & (cbs['Mtot']<=Mtot_range[1]))].index.unique()
+    bpp_cut = bpp.loc[cut_idxs]
 
     return bpp_cut
 
@@ -59,12 +61,13 @@ def gw190814_coarse(bpp):
                     np.max([np.asarray(cbs['mass_2']),np.asarray(cbs['mass_1'])], axis=0))
     cbs['Mtot'] = np.asarray(cbs['mass_1']) + np.asarray(cbs['mass_2'])
 
-    bpp_cut = cbs.loc[((cbs['q']>=q_range[0]) & (cbs['q']<=q_range[1])) & \
-                ((cbs['Mtot']>=Mtot_range[0]) & (cbs['Mtot']<=Mtot_range[1]))]
+    cut_idxs = cbs.loc[((cbs['q']>=q_range[0]) & (cbs['q']<=q_range[1])) & \
+                ((cbs['Mtot']>=Mtot_range[0]) & (cbs['Mtot']<=Mtot_range[1]))].index.unique()
+    bpp_cut = bpp.loc[cut_idxs]
 
     return bpp_cut
 
 _valid_filters = {'pessimistic_CE': pessimistic_CE, \
                   'gw190814': gw190814, \
                   'gw190814_approx': gw190814_approx, \
-                  'gw190814_coarse': gw190814_limit}
+                  'gw190814_coarse': gw190814_coarse}
