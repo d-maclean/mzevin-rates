@@ -56,12 +56,13 @@ if args.cosmic:
             bpp = filters.pessimistic_CE(bpp)
 
         # filters the bpp array for specified populations
+        cbc_classes = []
         for filt in args.filters:
             if filt not in filters._valid_filters:
                 raise ValueError('The filter you specified ({}) is not defined in the filters function!'.format(filt))
             filter_func  = filters._valid_filters[filt]
             model[float(met)][filt] = filter_func(bpp)
-            cbc_classes = [filt]
+            cbc_classes.append(filt)
 
     #  Calculate rates
     for cbc in cbc_classes:
