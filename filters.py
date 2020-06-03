@@ -10,8 +10,7 @@ def pessimistic_CE(bpp, pessimistic_merge=[0,1,2,7,8,10,11,12]):
     CE_merge_star1donor = CE_star1donor.loc[CE_star1donor['kstar_1'].isin(pessimistic_merge)].index.unique()
     CE_merge_star2donor = CE_star2donor.loc[CE_star2donor['kstar_2'].isin(pessimistic_merge)].index.unique()
     # drop these
-    bpp_cut = bpp.drop(CE_merge_star1donor)
-    bpp_cut = bpp.drop(CE_merge_star2donor)
+    bpp_cut = bpp.drop(np.union1d(CE_merge_star1donor,CE_merge_star2donor))
     return bpp_cut
 
 def bbh_filter(bpp):
