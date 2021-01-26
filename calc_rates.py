@@ -22,7 +22,7 @@ import filters
 # set free parameters in the model
 zmin = 0 #lowest redshift we are considering
 zmax = 15 #highest redshift we are considering
-local_z = 0.01 #max redshift of mergers in the "local" universe
+local_z = 0.1 #max redshift of mergers in the "local" universe
 N_zbins = 1000
 
 # --- Argument handling --- #
@@ -38,18 +38,23 @@ mdl_path = args.population
 model = {}
 
 if args.cosmic:
-    mets = os.listdir(mdl_path)
+    met_files = os.listdir(mdl_path)
     # process different CBC populations
-    for met in tqdm(mets):
-        cosmic_files = os.listdir(os.path.join(mdl_path,met))
+    for met_file in tqdm(met_files):
+        cosmic_files = os.listdir(os.path.join(mdl_path,met_file))
         dat_file = [item for item in cosmic_files if (item.startswith('dat')) and (item.endswith('.h5'))][0]
-        model[float(met)] = {}
+
+        # get metallicity for this COSMIC run
+        initC = pd.read_hdf(os.path.join(mdl_path,met_file,dat_file), key='initCond')
+        assert len(np.unique(initC['metallicity'])) == 1
+        met = float(initC['metallicity'].iloc[0])
+        model[met] = {}
 
         # get total stellar mass sampled
-        model[float(met)]['mass_stars'] = float(pd.read_hdf(os.path.join(mdl_path,met,dat_file), key='mass_stars').iloc[-1])
+        model[met]['mass_stars'] = float(pd.read_hdf(os.path.join(mdl_path,met_file,dat_file), key='mass_stars').iloc[-1])
 
         # read in bpp array
-        bpp = pd.read_hdf(os.path.join(mdl_path,met,dat_file), key='bpp')
+        bpp = pd.read_hdf(os.path.join(mdl_path,met_file,dat_file), key='bpp')
 
         # filter to get pessimistic CE, if specified
         if args.pessimistic:
@@ -61,7 +66,7 @@ if args.cosmic:
             if filt not in filters._valid_filters:
                 raise ValueError('The filter you specified ({}) is not defined in the filters function!'.format(filt))
             filter_func  = filters._valid_filters[filt]
-            model[float(met)][filt] = filter_func(bpp)
+            model[met][filt] = filter_func(bpp)
             cbc_classes.append(filt)
 
     #  Calculate rates
@@ -72,9 +77,9 @@ if args.cosmic:
 # do for general population
 else:
     df = pd.read_hdf(mdl_path, key='model')
-    for met in df['met'].unique():
+    for met in df['metallicity'].unique():
         model[met] = {}
-        df_tmp = df.loc[df['met']==met]
+        df_tmp = df.loc[df['metallicity']==met]
 
         mass_stars = df_tmp['mass_per_Z'].unique()
         assert len(mass_stars) == 1
