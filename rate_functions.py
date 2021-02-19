@@ -19,14 +19,12 @@ import importlib
 import glob
 from tqdm import tqdm
 import pdb
-from IPython.core.debugger import set_trace
 
 
 # set free parameters in the model
 Zsun = 0.017 #Solar metallicity
 lowZ = Zsun/200 #lower bound on metallicity
 highZ = 2*Zsun #upper bound on metallicity
-sigmaZ = 0.5 #sigma of the lognormal distribution about the mean metallicity
 
 
 def sfr_z(z, mdl='2017'):
@@ -50,7 +48,7 @@ def mean_metal_z(z):
     log_Z_Zsun = 0.153 - 0.074 * z**(1.34)
     return 10**(log_Z_Zsun) * Zsun
 
-def metal_disp_z(z, Z, sigma_Z=sigmaZ, lowZ=lowZ, highZ=highZ):
+def metal_disp_z(z, Z, sigmaZ=0.5, lowZ=lowZ, highZ=highZ):
     """
     Gives a weight for each metallicity Z at a redshift of z by assuming
     the metallicities are log-normally distributed about Z
@@ -74,7 +72,7 @@ def metal_disp_z(z, Z, sigma_Z=sigmaZ, lowZ=lowZ, highZ=highZ):
     return density
 
 
-def fmerge_at_z(model, zbin_low, zbin_high, cosmic=False, cbc_type=None, zmerge_min=0, zmerge_max=0.1):
+def fmerge_at_z(model, zbin_low, zbin_high, cosmic=False, cbc_type=None, sigmaZ=0.5, zmerge_min=0, zmerge_max=0.1):
     """
     Calculates the number of mergers of a particular CBC type per unit mass
     N_cor,i = f_bin f_IMF N_merger,i / Mtot,sim
@@ -122,7 +120,7 @@ def fmerge_at_z(model, zbin_low, zbin_high, cosmic=False, cbc_type=None, zmerge_
         midz = 10**(np.log10(zbin_low) + (np.log10(zbin_high)-np.log10(zbin_low))/2.0)
 
         # append the relative weight of this metallicity at this particular redshift
-        met_weights.append(metal_disp_z(midz, met))
+        met_weights.append(metal_disp_z(midz, met, sigmaZ=sigmaZ))
 
     # normalize metallicity weights so that they sum to unity
     met_weights = np.asarray(met_weights)/np.sum(met_weights)
@@ -131,7 +129,7 @@ def fmerge_at_z(model, zbin_low, zbin_high, cosmic=False, cbc_type=None, zmerge_
     return np.sum(np.asarray(f_merge)*met_weights)*u.Msun**(-1)
 
 
-def local_rate(model, zmin, zmax, cosmic=False, cbc_type=None, zmerge_min=0, zmerge_max=0.1, N_zbins=100):
+def local_rate(model, zmin, zmax, cosmic=False, cbc_type=None, sigmaZ=0.5, zmerge_min=0, zmerge_max=0.1, N_zbins=100):
     """
     Calculates the local merger rate, i.e. mergers that occur between zmerge_min and zmerge_max
     """
@@ -144,7 +142,7 @@ def local_rate(model, zmin, zmax, cosmic=False, cbc_type=None, zmerge_min=0, zme
     # work down from highest zbin
     for zbin_low, zbin_high in tqdm(zip(zbins[::-1][1:], zbins[::-1][:-1]), total=len(zbins)-1):
         # get local mergers per unit mass
-        floc = fmerge_at_z(model, zbin_low, zbin_high, cosmic, cbc_type, zmerge_min=zmerge_min, zmerge_max=zmerge_max)
+        floc = fmerge_at_z(model, zbin_low, zbin_high, cosmic, cbc_type, sigmaZ=sigmaZ, zmerge_min=zmerge_min, zmerge_max=zmerge_max)
         # get redshift at middle of the log-spaced zbin
         midz = 10**(np.log10(zbin_low) + (np.log10(zbin_high)-np.log10(zbin_low))/2.0)
         # get SFR at this redshift
