@@ -48,7 +48,7 @@ def mean_metal_z(z):
     log_Z_Zsun = 0.153 - 0.074 * z**(1.34)
     return 10**(log_Z_Zsun) * Zsun
 
-def metal_disp_z(z, Z, sigmaZ=0.5, lowZ=lowZ, highZ=highZ):
+def metal_disp_z(z, Z, sigmaZ=sigmaZ, lowZ=lowZ, highZ=highZ):
     """
     Gives a weight for each metallicity Z at a redshift of z by assuming
     the metallicities are log-normally distributed about Z
