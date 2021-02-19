@@ -30,11 +30,7 @@ argp.add_argument("-p", "--population", type=str, help="Path to the population y
 argp.add_argument("--cosmic", action="store_true", help='Specifies whether to expect COSMIC dat files. Default=False')
 argp.add_argument("--pessimistic", action="store_true", help="Specifies whether to filter bpp arrays using the 'pessimistic' CE scenario. Default=False")
 argp.add_argument("--filters", nargs="+", default=['bbh','nsbh','bns'], help="Specify filtering scheme(s) to get rates from a specified subset of the population. Filters are coded up in the 'filters.py' function.")
-<<<<<<< HEAD
 argp.add_argument("--sigmaZ", type=float, default=0.5, help="Sets the metallicity dispersion for the mean metallicity relation Z(z). Default=0.5")
-=======
-argp.add_argument("--Zdisp", default=0.5, help="Sets the dispersion of the log-normal distribution for metallicities. Default=0.5.")
->>>>>>> 0c7eea434af7178256fe4fb38092119276f91757
 args = argp.parse_args()
 
 # read in pop model, save the metallicities that are specified.
@@ -75,11 +71,7 @@ if args.cosmic:
 
     #  Calculate rates
     for cbc in cbc_classes:
-<<<<<<< HEAD
         R,_,_ = rate_functions.local_rate(model, zmin, zmax, cosmic=True, cbc_type=cbc, sigmaZ=args.sigmaZ, zmerge_min=0, zmerge_max=local_z, N_zbins=N_zbins)
-=======
-        R,_,_ = rate_functions.local_rate(model, zmin, zmax, cosmic=True, cbc_type=cbc, zmerge_min=0, zmerge_max=local_z, sigmaZ=args.Zdisp, N_zbins=N_zbins)
->>>>>>> 0c7eea434af7178256fe4fb38092119276f91757
         print("{} rate: {:0.2E} Gpc^-3 yr^-1".format(cbc,R.value))
 
 # do for general population
@@ -96,10 +88,6 @@ else:
         model[met]['mergers'] = df_tmp
 
     # Calculate rates
-<<<<<<< HEAD
     R,_,_ = rate_functions.local_rate(model, zmin, zmax, cosmic=False, cbc_type=None, sigmaZ=args.sigmaZ, zmerge_min=0, zmerge_max=local_z, N_zbins=N_zbins)
-=======
-    R,_,_ = rate_functions.local_rate(model, zmin, zmax, cosmic=False, cbc_type=None, zmerge_min=0, zmerge_max=local_z, sigmaZ=args.Zdisp, N_zbins=N_zbins)
->>>>>>> 0c7eea434af7178256fe4fb38092119276f91757
     print("rate: {:0.2E} Gpc^-3 yr^-1".format(R.value))
 
