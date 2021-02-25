@@ -99,7 +99,7 @@ def fmerge_at_z(model, zbin_low, zbin_high, zmerge_max, Zlow, Zhigh, sigmaZ, Zsu
             tdelay_max = cosmo.lookback_time(zbin_high).to(u.Myr).value
         else:
             tdelay_min = (cosmo.lookback_time(zbin_low) - cosmo.lookback_time(zmerge_max)).to(u.Myr).value
-            tdelay_max = (cosmo.lookback_time(zbin_high))
+            tdelay_max = (cosmo.lookback_time(zbin_high)).to(u.Myr).value
 
         if cosmic:
             Nmerge_zbin = len(merger.loc[(merger['tphys']<=tdelay_max) & (merger['tphys']>tdelay_min)])
