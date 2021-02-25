@@ -42,7 +42,7 @@ def mean_metal_z(z, Zsun=0.017):
     log_Z_Zsun = 0.153 - 0.074 * z**(1.34)
     return 10**(log_Z_Zsun) * Zsun
 
-def metal_disp_z(z, Z, sigmaZ, lowZ, highZ, Zsun=0.017):
+def metal_disp_z(z, Z, sigmaZ, Zlow, Zhigh, Zsun=0.017):
     """
     Gives a weight for each metallicity Z at a redshift of z by assuming
     the metallicities are log-normally distributed about Z
@@ -58,15 +58,15 @@ def metal_disp_z(z, Z, sigmaZ, lowZ, highZ, Zsun=0.017):
     log_mean_Z = np.log10(mean_metal_z(z, Zsun)) - (np.log(10)/2)*sigmaZ**2
 
     Z_dist = norm(loc=log_mean_Z, scale=sigmaZ)
-    Z_dist_above = norm(loc=2*np.log10(highZ)-log_mean_Z, scale=sigmaZ)
-    Z_dist_below = norm(loc=2*np.log10(lowZ)-log_mean_Z, scale=sigmaZ)
+    Z_dist_above = norm(loc=2*np.log10(Zhigh)-log_mean_Z, scale=sigmaZ)
+    Z_dist_below = norm(loc=2*np.log10(Zlow)-log_mean_Z, scale=sigmaZ)
 
     density = Z_dist.pdf(np.log10(Z)) + Z_dist_above.pdf(np.log10(Z)) + Z_dist_below.pdf(np.log10(Z))
 
     return density
 
 
-def fmerge_at_z(model, zbin_low, zbin_high, zmerge_max, lowZ, highZ, sigmaZ, Zsun=0.017, cbc_type=None, cosmic=False):
+def fmerge_at_z(model, zbin_low, zbin_high, zmerge_max, Zlow, Zhigh, sigmaZ, Zsun=0.017, cbc_type=None, cosmic=False):
     """
     Calculates the number of mergers of a particular CBC type per unit mass
     N_cor,i = f_bin f_IMF N_merger,i / Mtot,sim
@@ -99,13 +99,13 @@ def fmerge_at_z(model, zbin_low, zbin_high, zmerge_max, lowZ, highZ, sigmaZ, Zsu
             tdelay_max = cosmo.lookback_time(zbin_high).to(u.Myr).value
         else:
             tdelay_min = (cosmo.lookback_time(zbin_low) - cosmo.lookback_time(zmerge_max)).to(u.Myr).value
-            tdelay_max = (cosmo.lookback_time(zbin_high)
+            tdelay_max = (cosmo.lookback_time(zbin_high))
 
         if cosmic:
             Nmerge_zbin = len(merger.loc[(merger['tphys']<=tdelay_max) & (merger['tphys']>tdelay_min)])
         else:
             Nmerge_zbin = len(merger.loc[(merger['t_delay']<=tdelay_max) & (merger['t_delay']>tdelay_min)])
-            
+
 
         # get the number of mergers per unit mass
         f_merge.append(float(Nmerge_zbin) / mass_stars)
@@ -114,7 +114,7 @@ def fmerge_at_z(model, zbin_low, zbin_high, zmerge_max, lowZ, highZ, sigmaZ, Zsu
         midz = 10**(np.log10(zbin_low) + (np.log10(zbin_high)-np.log10(zbin_low))/2.0)
 
         # append the relative weight of this metallicity at this particular redshift
-        met_weights.append(metal_disp_z(midz, met, sigmaZ, lowZ, highZ, Zsun=Zsun))
+        met_weights.append(metal_disp_z(midz, met, sigmaZ, Zlow, Zhigh, Zsun=Zsun))
 
     # normalize metallicity weights so that they sum to unity
     met_weights = np.asarray(met_weights)/np.sum(met_weights)
@@ -130,13 +130,13 @@ def local_rate(model, zgrid_min, zgrid_max, zmerge_max, Nzbins, Zlow, Zhigh, sig
     if zgrid_min==0:
         # account for log-spaced bins
         zgrid_min = 1e-3
-    zbins = np.logspace(np.log10(zgrid_min), np.log10(zgrid_max), N_zbins+1)
+    zbins = np.logspace(np.log10(zgrid_min), np.log10(zgrid_max), Nzbins+1)
     zbin_contribution = []
 
     # work down from highest zbin
     for zbin_low, zbin_high in tqdm(zip(zbins[::-1][1:], zbins[::-1][:-1]), total=len(zbins)-1):
         # get local mergers per unit mass
-        floc = fmerge_at_z(model, zbin_low, zbin_high, zmerge_max, lowZ, highZ, sigmaZ, Zsun, cbc_type, cosmic)
+        floc = fmerge_at_z(model, zbin_low, zbin_high, zmerge_max, Zlow, Zhigh, sigmaZ, Zsun, cbc_type, cosmic)
         # get redshift at middle of the log-spaced zbin
         midz = 10**(np.log10(zbin_low) + (np.log10(zbin_high)-np.log10(zbin_low))/2.0)
         # get SFR at this redshift

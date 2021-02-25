@@ -29,7 +29,7 @@ argp.add_argument("--pessimistic", action="store_true", help="Specifies whether 
 argp.add_argument("--filters", nargs="+", default=['bbh','nsbh','bns'], help="Specify filtering scheme(s) to get rates from a specified subset of the population. Filters are coded up in the 'filters.py' function.")
 
 argp.add_argument("--zmin", type=float, default=0, help="Minimum redshift in redshift grid. Default=0.")
-argp.add_argument("--zmin", type=float, default=20, help="Maximum redshift in redshift grid. Default=20.")
+argp.add_argument("--zmax", type=float, default=20, help="Maximum redshift in redshift grid. Default=20.")
 argp.add_argument("--localz", type=float, default=0.1, help="Max redshift for what we consider 'local' mergers. Default=0.1.")
 argp.add_argument("--Nzbins", type=int, default=1000, help="Number of redshift bins to use in calculation. Default=1000.")
 
@@ -48,6 +48,7 @@ Zhigh = args.Zhigh * Zsun
 mdl_path = args.population
 model = {}
 
+print("Reading population models...\n")
 if args.cosmic:
     met_files = os.listdir(mdl_path)
     # process different CBC populations
@@ -82,6 +83,7 @@ if args.cosmic:
 
     #  Calculate rates
     for cbc in cbc_classes:
+        print("Calculating rate for {} class...".format(cbc))
         R,_,_ = rate_functions.local_rate(model, \
                     zgrid_min=args.zmin, zgrid_max=args.zmax, zmerge_max=args.localz, Nzbins=args.Nzbins, \
                     Zlow=Zlow, Zhigh=Zhigh, sigmaZ=args.sigmaZ, Zsun=Zsun, \
@@ -102,6 +104,7 @@ else:
         model[met]['mergers'] = df_tmp
 
     # Calculate rates
+    print("Calculating rates...")
     R,_,_ = rate_functions.local_rate(model, \
                 zgrid_min=args.zmin, zgrid_max=args.zmax, zmerge_max=args.localz, Nzbins=args.Nzbins, \
                 Zlow=Zlow, Zhigh=Zhigh, sigmaZ=args.sigmaZ, Zsun=Zsun, \
