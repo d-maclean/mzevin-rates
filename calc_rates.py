@@ -19,19 +19,30 @@ import rate_functions
 import filters
 
 # set free parameters in the model
-zmin = 0 #lowest redshift we are considering
-zmax = 15 #highest redshift we are considering
-local_z = 0.1 #max redshift of mergers in the "local" universe
-N_zbins = 1000
 
 # --- Argument handling --- #
 argp = argparse.ArgumentParser()
 argp.add_argument("-p", "--population", type=str, help="Path to the population you wish to calculate rates for. If --cosmic is set, it will assume the runs are saved in the standard COSMIC output with subdirectories for each metallicity run. Otherwise, will expect an hdf file with key 'model' that is a dataframe which includes 't_delay', 'met', and 'mass_per_Z'.")
-argp.add_argument("--cosmic", action="store_true", help='Specifies whether to expect COSMIC dat files. Default=False')
-argp.add_argument("--pessimistic", action="store_true", help="Specifies whether to filter bpp arrays using the 'pessimistic' CE scenario. Default=False")
+
+argp.add_argument("--cosmic", action="store_true", help="Specifies whether to expect COSMIC dat files. Default=False.")
+argp.add_argument("--pessimistic", action="store_true", help="Specifies whether to filter bpp arrays using the 'pessimistic' CE scenario. Default=False.")
 argp.add_argument("--filters", nargs="+", default=['bbh','nsbh','bns'], help="Specify filtering scheme(s) to get rates from a specified subset of the population. Filters are coded up in the 'filters.py' function.")
-argp.add_argument("--sigmaZ", type=float, default=0.5, help="Sets the metallicity dispersion for the mean metallicity relation Z(z). Default=0.5")
+
+argp.add_argument("--zmin", type=float, default=0, help="Minimum redshift in redshift grid. Default=0.")
+argp.add_argument("--zmin", type=float, default=20, help="Maximum redshift in redshift grid. Default=20.")
+argp.add_argument("--localz", type=float, default=0.1, help="Max redshift for what we consider 'local' mergers. Default=0.1.")
+argp.add_argument("--Nzbins", type=int, default=1000, help="Number of redshift bins to use in calculation. Default=1000.")
+
+argp.add_argument("--Zsun", type=float, default=0.017, help="Sets the assumed Solar metallicity. Note that the relations from Madau & Fragos 2017 assume a Solar metallicity of Zsun=0.017. Default=0.017.")
+argp.add_argument("--Zlow", type=float, default=1./200, help="Sets the lower bound of the metallicity in units of Zsun. Default=1/200.")
+argp.add_argument("--Zhigh", type=float, default=2.0, help="Sets the lower bound of the metallicity in units of Zsun. Default=2.")
+argp.add_argument("--sigmaZ", type=float, default=0.5, help="Sets the metallicity dispersion for the mean metallicity relation Z(z). Default=0.5.")
 args = argp.parse_args()
+
+# Get pertinent metallicities
+Zsun = args.Zsun
+Zlow = args.Zlow * Zsun
+Zhigh = args.Zhigh * Zsun
 
 # read in pop model, save the metallicities that are specified.
 mdl_path = args.population
@@ -71,7 +82,10 @@ if args.cosmic:
 
     #  Calculate rates
     for cbc in cbc_classes:
-        R,_,_ = rate_functions.local_rate(model, zmin, zmax, cosmic=True, cbc_type=cbc, sigmaZ=args.sigmaZ, zmerge_min=0, zmerge_max=local_z, N_zbins=N_zbins)
+        R,_,_ = rate_functions.local_rate(model, \
+                    zgrid_min=args.zmin, zgrid_max=args.zmax, zmerge_max=args.localz, Nzbins=args.Nzbins, \
+                    Zlow=Zlow, Zhigh=Zhigh, sigmaZ=args.sigmaZ, Zsun=Zsun, \
+                    cbc_type=cbc, cosmic=True)
         print("{} rate: {:0.2E} Gpc^-3 yr^-1".format(cbc,R.value))
 
 # do for general population
@@ -88,6 +102,9 @@ else:
         model[met]['mergers'] = df_tmp
 
     # Calculate rates
-    R,_,_ = rate_functions.local_rate(model, zmin, zmax, cosmic=False, cbc_type=None, sigmaZ=args.sigmaZ, zmerge_min=0, zmerge_max=local_z, N_zbins=N_zbins)
+    R,_,_ = rate_functions.local_rate(model, \
+                zgrid_min=args.zmin, zgrid_max=args.zmax, zmerge_max=args.localz, Nzbins=args.Nzbins, \
+                Zlow=Zlow, Zhigh=Zhigh, sigmaZ=args.sigmaZ, Zsun=Zsun, \
+                cbc_type=cbc, cosmic=False)
     print("rate: {:0.2E} Gpc^-3 yr^-1".format(R.value))
 
