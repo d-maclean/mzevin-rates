@@ -117,7 +117,25 @@ def fmerge_at_z(model, zbin_low, zbin_high, zmerge_max, Zlow, Zhigh, sigmaZ, Zsu
     """
 
     f_merge = []
-    met_weights = []
+    met_cdfs = []
+
+    # get the minimum and maximum lookback times for this redshift
+    if zbin_low==0:
+        # special treatment for the first bin in the local universe
+        tdelay_min = 0
+        tdelay_max = cosmo.lookback_time(zbin_high).to(u.Myr).value
+    else:
+        tdelay_min = (cosmo.lookback_time(zbin_low) - cosmo.lookback_time(zmerge_max)).to(u.Myr).value
+        tdelay_max = (cosmo.lookback_time(zbin_high)).to(u.Myr).value
+
+    # redshift in the middle of this log-spaced interval
+    midz = 10**(np.log10(zbin_low) + (np.log10(zbin_high)-np.log10(zbin_low))/2.0)
+
+    # relavent probability density function at this redshift
+    if corrected_mean_interp is not None:
+        Z_dist = metal_disp_truncnorm_corrected(midz, corrected_mean_interp, sigmaZ, Zlow, Zhigh, Zsun=Zsun)
+    else:
+        Z_dist = metal_disp_truncnorm(midz, sigmaZ, Zlow, Zhigh, Zsun=Zsun)
 
     for met in sorted(model.keys()):
 
@@ -130,35 +148,26 @@ def fmerge_at_z(model, zbin_low, zbin_high, zmerge_max, Zlow, Zhigh, sigmaZ, Zsu
             merger = model[met]['mergers']
 
         # get the fraction of systems born between [zlow,zhigh] that merger between [0,zmerge_max]
-        if zbin_low==0:
-            # special treatment for the first bin in the local universe
-            tdelay_min = 0
-            tdelay_max = cosmo.lookback_time(zbin_high).to(u.Myr).value
-        else:
-            tdelay_min = (cosmo.lookback_time(zbin_low) - cosmo.lookback_time(zmerge_max)).to(u.Myr).value
-            tdelay_max = (cosmo.lookback_time(zbin_high)).to(u.Myr).value
-
         if cosmic:
             Nmerge_zbin = len(merger.loc[(merger['tphys']<=tdelay_max) & (merger['tphys']>tdelay_min)])
         else:
             Nmerge_zbin = len(merger.loc[(merger['t_delay']<=tdelay_max) & (merger['t_delay']>tdelay_min)])
 
-
         # get the number of mergers per unit mass
         f_merge.append(float(Nmerge_zbin) / mass_stars)
 
-        # get redshift in the middle of this log-spaced interval
-        midz = 10**(np.log10(zbin_low) + (np.log10(zbin_high)-np.log10(zbin_low))/2.0)
+        met_cdfs.append(Z_dist.cdf(np.log10(met)))
 
-        # append the relative weight of this metallicity at this particular redshift
-        if corrected_mean_interp is not None:
-            dispersion = metal_disp_truncnorm_corrected(midz, corrected_mean_interp, sigmaZ, Zlow, Zhigh, Zsun=Zsun)
-        else:
-            dispersion = metal_disp_truncnorm(midz, sigmaZ, Zlow, Zhigh, Zsun=Zsun)
-        met_weights.append(dispersion.pdf(np.log10(met)))
+    # get the weight of each metallicity model at this redshift by taking the midpoints
+    # between all cdf values, with the lowest and highest metallicities getting the weight
+    # up to Zlow and Zhigh, respectively
+    met_cdfs = np.asarray(met_cdfs)
+    cdf_midpts = met_cdfs[:-1] + (met_cdfs[1:]-met_cdfs[:-1])/2
+    met_cdf_ranges = np.append(np.append(0, cdf_midpts), 1)
+    met_weights = met_cdf_ranges[1:] - met_cdf_ranges[:-1]
 
-    # normalize metallicity weights so that they sum to unity
-    met_weights = np.asarray(met_weights)/np.sum(met_weights)
+    # metallicity weights should sum to unity (to numerical precision)
+    assert ((np.sum(met_weights) > 0.9999) and (np.sum(met_weights) < 1.0001)), "The weights for the metallicities at redshift z={:0.2f} do not sum to unity (they sum to {:0.5f})!".format(midz, np.sum(met_weights))
 
     # return weighted sum of f_merge, units of Msun**-1
     return np.sum(np.asarray(f_merge)*met_weights)*u.Msun**(-1)
