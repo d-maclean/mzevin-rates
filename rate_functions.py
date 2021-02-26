@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from scipy.stats import norm
+from scipy.stats import norm, truncnorm
 from scipy.special import erf
 from scipy.integrate import quad
 
@@ -42,7 +42,7 @@ def mean_metal_z(z, Zsun=0.017):
     log_Z_Zsun = 0.153 - 0.074 * z**(1.34)
     return 10**(log_Z_Zsun) * Zsun
 
-def metal_disp_z(z, Z, sigmaZ, Zlow, Zhigh, Zsun=0.017):
+def metal_disp_truncnorm(z, sigmaZ, Zlow, Zhigh, Zsun=0.017):
     """
     Gives a weight for each metallicity Z at a redshift of z by assuming
     the metallicities are log-normally distributed about Z
@@ -57,13 +57,52 @@ def metal_disp_z(z, Z, sigmaZ, Zlow, Zhigh, Zsun=0.017):
     """
     log_mean_Z = np.log10(mean_metal_z(z, Zsun)) - (np.log(10)/2)*sigmaZ**2
 
-    Z_dist = norm(loc=log_mean_Z, scale=sigmaZ)
-    Z_dist_above = norm(loc=2*np.log10(Zhigh)-log_mean_Z, scale=sigmaZ)
-    Z_dist_below = norm(loc=2*np.log10(Zlow)-log_mean_Z, scale=sigmaZ)
+    a, b = (np.log10(Zlow) - log_mean_Z) / sigmaZ, (np.log10(Zhigh) - log_mean_Z) / sigmaZ
+    Z_dist = truncnorm(a, b, loc=log_mean_Z, scale=sigmaZ)
 
-    density = Z_dist.pdf(np.log10(Z)) + Z_dist_above.pdf(np.log10(Z)) + Z_dist_below.pdf(np.log10(Z))
+    return Z_dist
 
-    return density
+def corrected_means_for_truncated_lognormal(sigmaZ, Zlow, Zhigh):
+    """
+    Function that returns an interpolant to get an adjusted log-normal mean
+    such that the resultant truncated normal distribution preserves the mean
+    
+    The interpolant will take in the log-normal mean that you *want* after truncation, 
+    and gives you the mean you should use when constructing your truncated normal distribution
+    """
+    log_desired_means = np.linspace(-5,1, 1000)   # tunable, eventually range will give bogus values
+    means_for_constructing_lognormal = log_desired_means - (np.log(10)/2)*sigmaZ**2
+
+    means_from_truncated_lognormal = []
+    for m in means_for_constructing_lognormal:
+        a, b = (np.log10(Zlow) - m) / sigmaZ, (np.log10(Zhigh) - m) / sigmaZ
+        Z_dist = truncnorm(a, b, loc=m, scale=sigmaZ)
+        means_from_truncated_lognormal.append(Z_dist.moment(1))
+        
+    truncated_mean_to_gaussian_mean = interp1d(means_from_truncated_lognormal, log_desired_means, \
+                   bounds_error=False, fill_value=(np.min(log_desired_means), np.max(log_desired_means)))
+
+    return truncated_mean_to_gaussian_mean
+
+def metal_disp_truncnorm_corrected(z, mean_transformation_interp, sigmaZ, Zlow, Zhigh, Zsun=0.017):
+    """
+    Gives a weight for each metallicity Z at a redshift of z by assuming
+    the metallicities are log-normally distributed about Z
+
+    Metallicities are in standard units ([Fe/H])
+    Default dispersion is half a dex
+
+    lowZ and highZ indicate the lower and upper metallicity bounds; values drawn below these
+    will be reflected to ensure the distribution is properly normalized
+
+    NOTE: Be careful in calculating the mean of a log-normal distribution correctly!
+    """
+    log_mean_Z = np.log10(mean_metal_z(z, Zsun)) - (np.log(10)/2)*sigmaZ**2
+
+    a, b = (np.log10(Zlow) - log_mean_Z) / sigmaZ, (np.log10(Zhigh) - log_mean_Z) / sigmaZ
+    Z_dist = truncnorm(a, b, loc=log_mean_Z, scale=sigmaZ)
+
+    return Z_dist
 
 
 def fmerge_at_z(model, zbin_low, zbin_high, zmerge_max, Zlow, Zhigh, sigmaZ, Zsun=0.017, cbc_type=None, cosmic=False):
@@ -114,7 +153,8 @@ def fmerge_at_z(model, zbin_low, zbin_high, zmerge_max, Zlow, Zhigh, sigmaZ, Zsu
         midz = 10**(np.log10(zbin_low) + (np.log10(zbin_high)-np.log10(zbin_low))/2.0)
 
         # append the relative weight of this metallicity at this particular redshift
-        met_weights.append(metal_disp_z(midz, met, sigmaZ, Zlow, Zhigh, Zsun=Zsun))
+        dispersion = metal_disp_truncnorm(midz, sigmaZ, Zlow, Zhigh, Zsun=Zsun)
+        met_weights.append(dispersion.pdf(np.log10(met)))
 
     # normalize metallicity weights so that they sum to unity
     met_weights = np.asarray(met_weights)/np.sum(met_weights)
