@@ -37,6 +37,7 @@ argp.add_argument("--Zsun", type=float, default=0.017, help="Sets the assumed So
 argp.add_argument("--Zlow", type=float, default=1./200, help="Sets the lower bound of the metallicity in units of Zsun. Default=1/200.")
 argp.add_argument("--Zhigh", type=float, default=2.0, help="Sets the lower bound of the metallicity in units of Zsun. Default=2.")
 argp.add_argument("--sigmaZ", type=float, default=0.5, help="Sets the metallicity dispersion for the mean metallicity relation Z(z). Default=0.5.")
+argp.add_argument("--sigmaZ-method", type=str, default="truncnorm", help="Sets the method for calculating the metallicity dispersion. 'truncnorm' will use the standard truncated normal at the mean metallicity Z(z). 'corrected_truncnorm' will adjust the mean provided when defining the probability density such that it reproduces the correct mean metallicity Z(z) when the truncated normal probability density is constructed. Default='truncnorm'.")
 args = argp.parse_args()
 
 # Get pertinent metallicities
@@ -87,7 +88,7 @@ if args.cosmic:
         R,_,_ = rate_functions.local_rate(model, \
                     zgrid_min=args.zmin, zgrid_max=args.zmax, zmerge_max=args.localz, Nzbins=args.Nzbins, \
                     Zlow=Zlow, Zhigh=Zhigh, sigmaZ=args.sigmaZ, Zsun=Zsun, \
-                    cbc_type=cbc, cosmic=True)
+                    cbc_type=cbc, cosmic=True, met_disp_method=args.sigmaZ_method)
         print("{} rate: {:0.2E} Gpc^-3 yr^-1".format(cbc,R.value))
 
 # do for general population
@@ -108,6 +109,6 @@ else:
     R,_,_ = rate_functions.local_rate(model, \
                 zgrid_min=args.zmin, zgrid_max=args.zmax, zmerge_max=args.localz, Nzbins=args.Nzbins, \
                 Zlow=Zlow, Zhigh=Zhigh, sigmaZ=args.sigmaZ, Zsun=Zsun, \
-                cbc_type=cbc, cosmic=False)
+                cbc_type=cbc, cosmic=False, met_disp_method=args.sigmaZ_method)
     print("rate: {:0.2E} Gpc^-3 yr^-1".format(R.value))
 
