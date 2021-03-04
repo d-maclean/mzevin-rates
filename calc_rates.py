@@ -51,7 +51,8 @@ Zhigh = args.Zhigh * Zsun
 mdl_path = args.population
 model = {}
 
-print("Reading population models...\n")
+if args.verbose:
+    print("Reading population models...\n")
 if args.cosmic:
     met_files = os.listdir(mdl_path)
     # process different CBC populations
