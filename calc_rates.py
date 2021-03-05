@@ -33,6 +33,11 @@ argp.add_argument("--sigmaZ-method", type=str, default="truncnorm", help="Sets t
 argp.add_argument("--verbose", action="store_true", help="Prints extra info. Default=False.")
 args = argp.parse_args()
 
+# change working directory to where this code is
+abspath = os.path.abspath(__file__)
+dirpath = os.path.dirname(abspath)
+os.chdir(dirpath)
+
 # Get pertinent metallicities
 Zsun = args.Zsun
 Zlow = args.Zlow * Zsun
@@ -47,7 +52,7 @@ if args.verbose:
 if args.cosmic:
     met_files = os.listdir(mdl_path)
     # process different CBC populations
-    for met_file in tqdm(met_files):
+    for met_file in tqdm(met_files[::4]):
         cosmic_files = os.listdir(os.path.join(mdl_path,met_file))
         dat_file = [item for item in cosmic_files if (item.startswith('dat')) and (item.endswith('.h5'))][0]
 
@@ -81,9 +86,9 @@ if args.cosmic:
         if args.verbose:
             print("Calculating rate for {} class...".format(cbc))
         R,_,_ = rate_functions.local_rate(model, \
-                    zgrid_min=args.zmin, zgrid_max=args.zmax, zmerge_max=args.localz, Nzbins=args.Nzbins, \
-                    Zlow=Zlow, Zhigh=Zhigh, sigmaZ=args.sigmaZ, Zsun=Zsun, \
-                    cbc_type=cbc, cosmic=True, met_disp_method=args.sigmaZ_method)
+                zgrid_min=args.zmin, zgrid_max=args.zmax, zmerge_max=args.localz, Nzbins=args.Nzbins, \
+                Zlow=Zlow, Zhigh=Zhigh, sigmaZ=args.sigmaZ, met_disp_method=args.sigmaZ_method, \
+                Zsun=Zsun, cbc_type=cbc, cosmic=True)
         print("{} rate: {:0.2E} Gpc^-3 yr^-1".format(cbc,R.value))
 
 # do for general population
@@ -103,8 +108,8 @@ else:
     if args.verbose:
         print("Calculating rates...")
     R,_,_ = rate_functions.local_rate(model, \
-                zgrid_min=args.zmin, zgrid_max=args.zmax, zmerge_max=args.localz, Nzbins=args.Nzbins, \
-                Zlow=Zlow, Zhigh=Zhigh, sigmaZ=args.sigmaZ, Zsun=Zsun, \
-                cbc_type=cbc, cosmic=False, met_disp_method=args.sigmaZ_method)
+            zgrid_min=args.zmin, zgrid_max=args.zmax, zmerge_max=args.localz, Nzbins=args.Nzbins, \
+            Zlow=Zlow, Zhigh=Zhigh, sigmaZ=args.sigmaZ, met_disp_method=args.sigmaZ_method, \
+            Zsun=Zsun, cbc_type=cbc, cosmic=False)
     print("rate: {:0.2E} Gpc^-3 yr^-1".format(R.value))
 
