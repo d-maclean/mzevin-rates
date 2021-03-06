@@ -52,7 +52,7 @@ if args.verbose:
 if args.cosmic:
     met_files = os.listdir(mdl_path)
     # process different CBC populations
-    for met_file in tqdm(met_files[::4]):
+    for met_file in tqdm(met_files):
         cosmic_files = os.listdir(os.path.join(mdl_path,met_file))
         dat_file = [item for item in cosmic_files if (item.startswith('dat')) and (item.endswith('.h5'))][0]
 
