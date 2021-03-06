@@ -1,23 +1,13 @@
 import numpy as np
-import pandas as pd
 
 from scipy.stats import norm, truncnorm
-from scipy.special import erf
-from scipy.integrate import quad
 from scipy.interpolate import interp1d
 
 import astropy.units as u
-import astropy.constants as C
-from astropy.cosmology import z_at_value
 from astropy.cosmology import Planck15 as cosmo
+from astropy.cosmology import z_at_value
 
-import os
-import pickle
-import sys
 import h5py
-import itertools
-import importlib
-import glob
 from tqdm import tqdm
 import pdb
 
@@ -103,7 +93,7 @@ def metal_disp_truncnorm_corrected(z, mean_transformation_interp, sigmaZ, Zlow, 
     return Z_dist
 
 
-def fmerge_at_z(model, zbin_low, zbin_high, zmerge_max, Zlow, Zhigh, sigmaZ, Zsun=0.017, cbc_type=None, cosmic=False, corrected_mean_interp=None):
+def fmerge_at_z(model, zbin_low, zbin_high, zmerge_max, Zlow, Zhigh, sigmaZ, met_disp_method, Zsun=0.017, cbc_type=None, cosmic=False, corrected_mean_interp=None, extra_data=None):
     """
     Calculates the number of mergers of a particular CBC type per unit mass
     N_cor,i = f_bin f_IMF N_merger,i / Mtot,sim
@@ -128,14 +118,29 @@ def fmerge_at_z(model, zbin_low, zbin_high, zmerge_max, Zlow, Zhigh, sigmaZ, Zsu
         tdelay_min = (cosmo.lookback_time(zbin_low) - cosmo.lookback_time(zmerge_max)).to(u.Myr).value
         tdelay_max = (cosmo.lookback_time(zbin_high)).to(u.Myr).value
 
+    
     # redshift in the middle of this log-spaced interval
     midz = 10**(np.log10(zbin_low) + (np.log10(zbin_high)-np.log10(zbin_low))/2.0)
 
     # relavent probability density function at this redshift
-    if corrected_mean_interp is not None:
-        Z_dist = metal_disp_truncnorm_corrected(midz, corrected_mean_interp, sigmaZ, Zlow, Zhigh, Zsun=Zsun)
-    else:
+    if met_disp_method=='truncnorm':
         Z_dist = metal_disp_truncnorm(midz, sigmaZ, Zlow, Zhigh, Zsun=Zsun)
+    elif met_disp_method=='corrected_truncnorm':
+        Z_dist = metal_disp_truncnorm_corrected(midz, corrected_mean_interp, sigmaZ, Zlow, Zhigh, Zsun=Zsun)
+    elif met_disp_method=='illustris':
+        (redz, Z, M) = extra_data
+        # only use data within the metallicity bounds
+        valid_met_idxs = np.where((Z >= Zlow) & (Z <= Zhigh))[0]
+        # get the index of the correct redshift in the data
+        redz_idx = np.where(redz <= midz)[0][0]
+        # take values of the data at this redshift between our metallicity bounds
+        Z_dist = M[redz_idx, valid_met_idxs]
+        if np.sum(Z_dist)==0:
+            # no star formation in range of metallicities at this redshift
+            Z_dist_cdf_interp = None
+        else:
+            Z_dist_cdf = np.cumsum(Z_dist / Z_dist.sum())
+            Z_dist_cdf_interp = interp1d(np.log10(Z[valid_met_idxs]), Z_dist_cdf, fill_value="extrapolate")
 
     for met in sorted(model.keys()):
 
@@ -156,24 +161,33 @@ def fmerge_at_z(model, zbin_low, zbin_high, zmerge_max, Zlow, Zhigh, sigmaZ, Zsu
         # get the number of mergers per unit mass
         f_merge.append(float(Nmerge_zbin) / mass_stars)
 
-        met_cdfs.append(Z_dist.cdf(np.log10(met)))
+        if met_disp_method=='illustris':
+            if Z_dist_cdf_interp is not None:
+                met_cdfs.append(Z_dist_cdf_interp(np.log10(met)))
+            else:
+                met_cdfs = None
+        else:
+            met_cdfs.append(Z_dist.cdf(np.log10(met)))
 
     # get the weight of each metallicity model at this redshift by taking the midpoints
     # between all cdf values, with the lowest and highest metallicities getting the weight
     # up to Zlow and Zhigh, respectively
-    met_cdfs = np.asarray(met_cdfs)
-    cdf_midpts = met_cdfs[:-1] + (met_cdfs[1:]-met_cdfs[:-1])/2
-    met_cdf_ranges = np.append(np.append(0, cdf_midpts), 1)
-    met_weights = met_cdf_ranges[1:] - met_cdf_ranges[:-1]
+    if met_cdfs is not None:
+        met_cdfs = np.asarray(met_cdfs)
+        cdf_midpts = met_cdfs[:-1] + (met_cdfs[1:]-met_cdfs[:-1])/2
+        met_cdf_ranges = np.append(np.append(0, cdf_midpts), 1)
+        met_weights = met_cdf_ranges[1:] - met_cdf_ranges[:-1]
 
-    # metallicity weights should sum to unity (to numerical precision)
-    assert ((np.sum(met_weights) > 0.9999) and (np.sum(met_weights) < 1.0001)), "The weights for the metallicities at redshift z={:0.2f} do not sum to unity (they sum to {:0.5f})!".format(midz, np.sum(met_weights))
+        # metallicity weights should sum to unity (to numerical precision)
+        assert ((np.sum(met_weights) > 0.9999) and (np.sum(met_weights) < 1.0001)), "The weights for the metallicities at redshift z={:0.2f} do not sum to unity (they sum to {:0.5f})!".format(midz, np.sum(met_weights))
+    else:
+        met_weights = 0.0
 
     # return weighted sum of f_merge, units of Msun**-1
     return np.sum(np.asarray(f_merge)*met_weights)*u.Msun**(-1)
 
 
-def local_rate(model, zgrid_min, zgrid_max, zmerge_max, Nzbins, Zlow, Zhigh, sigmaZ, Zsun=0.017, cbc_type=None, cosmic=False, met_disp_method='truncnorm'):
+def local_rate(model, zgrid_min, zgrid_max, zmerge_max, Nzbins, Zlow, Zhigh, sigmaZ, met_disp_method, Zsun=0.017, cbc_type=None, cosmic=False):
     """
     Calculates the local merger rate, i.e. mergers that occur between z=0 and zmerge_max
     """
@@ -187,19 +201,61 @@ def local_rate(model, zgrid_min, zgrid_max, zmerge_max, Nzbins, Zlow, Zhigh, sig
     # from the log-normal mean to the truncated log-normal mean
     if met_disp_method=='truncnorm':
         corrected_mean_interp = None
+        illustris_data = None
     elif met_disp_method=='corrected_truncnorm':
         corrected_mean_interp = corrected_means_for_truncated_lognormal(sigmaZ, Zlow, Zhigh)
+        illustris_data = None
+    # get stuff that we need from the Illustris data
+    elif met_disp_method=='illustris':
+        corrected_mean_interp = None
+        with h5py.File('./data/TNG100_L75n1820TNG__x-t-log_y-Z-log.hdf5', 'r') as f:
+            time_bins = f['xedges'][:]
+            met_bins = f['yedges'][1:-1]   # kill the top and bottom metallicity bins, we won't need them and they go to inf
+            Mform = f['mass'][:,1:-1]
+        # we only care about stuff before today
+        tmax = cosmo.age(0).to(u.yr).value
+        young_enough = np.argwhere(time_bins <= tmax)
+        time_bins = np.squeeze(time_bins[young_enough])
+        Mform = np.squeeze(Mform[young_enough, :])
+        # add tH to beginning of time_bins, assume this bin just spans until today
+        time_bins = np.append(time_bins, tmax)
+        # get times and metallicity bin centers
+        times = 10**(np.log10(time_bins[:-1])+((np.log10(time_bins[1:])-np.log10(time_bins[:-1]))/2))
+        mets = 10**(np.log10(met_bins[:-1])+((np.log10(met_bins[1:])-np.log10(met_bins[:-1]))/2))
+        # calculate redshifts for midpoints and bin edges
+        redshifts = []
+        for t in tqdm(times):
+            redshifts.append(z_at_value(cosmo.age, t*u.yr))
+        redshifts = np.asarray(redshifts)
+        redshift_bins = []
+        for t in tqdm(time_bins[:-1]):
+            redshift_bins.append(z_at_value(cosmo.age, t*u.yr))
+        redshift_bins.append(0)   # special treatment for most local bin
+        redshift_bins = np.asarray(redshift_bins)
+        # time duration in each bin
+        dt = time_bins[1:] - time_bins[:-1]
+        # get interpolant for the SFR as as function of time, convert 100 Mpc^3 box to Msun Mpc^-3 yr^-1
+        sfr_pts = np.sum(Mform, axis=1) / dt / 100**3
+        sfr_interp = interp1d(redshifts, sfr_pts)
+        # we need to pass some of this Illustris data to fmerge_at_z function
+        illustris_data = (redshifts, mets, Mform)
     else:
         raise NameError("The metallicity dispersion method you provided ({}) is not defined!".format(met_disp_method))
+
 
     # work down from highest zbin
     for zbin_low, zbin_high in tqdm(zip(zbins[::-1][1:], zbins[::-1][:-1]), total=len(zbins)-1):
         # get local mergers per unit mass
-        floc = fmerge_at_z(model, zbin_low, zbin_high, zmerge_max, Zlow, Zhigh, sigmaZ, Zsun, cbc_type, cosmic, corrected_mean_interp=corrected_mean_interp)
+        floc = fmerge_at_z(model, zbin_low, zbin_high, zmerge_max, Zlow, Zhigh, \
+                    sigmaZ, met_disp_method, Zsun, cbc_type, cosmic, \
+                    corrected_mean_interp=corrected_mean_interp, extra_data=illustris_data)
         # get redshift at middle of the log-spaced zbin
         midz = 10**(np.log10(zbin_low) + (np.log10(zbin_high)-np.log10(zbin_low))/2.0)
         # get SFR at this redshift
-        sfr = sfr_z(midz) * u.M_sun * u.Mpc**(-3) * u.yr**(-1)
+        if met_disp_method=='illustris':
+            sfr = sfr_interp(midz) * u.M_sun * u.Mpc**(-3) * u.yr**(-1)
+        else:
+            sfr = sfr_z(midz) * u.M_sun * u.Mpc**(-3) * u.yr**(-1)
         # cosmological factor
         E_z = (cosmo._Onu0*(1+midz)**4 + cosmo._Om0*(1+midz)**3 + cosmo._Ok0*(1+midz)**2 + cosmo._Ode0)**(1./2)
         # add the contribution from this zbin to the sum
