@@ -25,8 +25,8 @@ argp.add_argument("--localz", type=float, default=0.1, help="Max redshift for wh
 argp.add_argument("--Nzbins", type=int, default=1000, help="Number of redshift bins to use in calculation. Default=1000.")
 
 argp.add_argument("--Zsun", type=float, default=0.017, help="Sets the assumed Solar metallicity. Note that the relations from Madau & Fragos 2017 assume a Solar metallicity of Zsun=0.017. Default=0.017.")
-argp.add_argument("--Zlow", type=float, default=1./200, help="Sets the lower bound of the metallicity in units of Zsun. Default=1/200.")
-argp.add_argument("--Zhigh", type=float, default=2.0, help="Sets the lower bound of the metallicity in units of Zsun. Default=2.")
+argp.add_argument("--Zlow", type=float, default=0.0001, help="Sets the lower bound of the metallicity in absolute unites. Default=0.0001.")
+argp.add_argument("--Zhigh", type=float, default=0.03, help="Sets the upper bound of the metallicity in absolute units. Default=0.03.")
 argp.add_argument("--sigmaZ", type=float, default=0.5, help="Sets the metallicity dispersion for the mean metallicity relation Z(z). Default=0.5.")
 argp.add_argument("--sigmaZ-method", type=str, default="truncnorm", help="Sets the method for calculating the metallicity dispersion. 'truncnorm' will use the standard truncated normal at the mean metallicity Z(z). 'corrected_truncnorm' will adjust the mean provided when defining the probability density such that it reproduces the correct mean metallicity Z(z) when the truncated normal probability density is constructed. 'illustris' will use the SFR(Z,z) from the Illustris-TNG simulation, and will supersede whatever is given in the 'sigmaZ' argument.  Default='truncnorm'.")
 
@@ -40,8 +40,8 @@ os.chdir(dirpath)
 
 # Get pertinent metallicities
 Zsun = args.Zsun
-Zlow = args.Zlow * Zsun
-Zhigh = args.Zhigh * Zsun
+Zlow = args.Zlow
+Zhigh = args.Zhigh
 
 # read in pop model, save the metallicities that are specified.
 mdl_path = args.population
