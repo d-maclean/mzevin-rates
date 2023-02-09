@@ -110,6 +110,6 @@ else:
     R,_,_ = rate_functions.local_rate(model, \
             zgrid_min=args.zmin, zgrid_max=args.zmax, zmerge_max=args.localz, Nzbins=args.Nzbins, \
             Zlow=Zlow, Zhigh=Zhigh, sigmaZ=args.sigmaZ, met_disp_method=args.sigmaZ_method, \
-            Zsun=Zsun, cbc_type=cbc, cosmic=False)
+            Zsun=Zsun, cosmic=False)
     print("rate: {:0.2E} Gpc^-3 yr^-1".format(R.value))
 
