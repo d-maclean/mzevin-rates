@@ -234,8 +234,9 @@ def local_rate(model, zgrid_min, zgrid_max, zmerge_max, Nzbins, Zlow, Zhigh, sig
         redshift_bins = np.asarray(redshift_bins)
         # time duration in each bin
         dt = time_bins[1:] - time_bins[:-1]
-        # get interpolant for the SFR as as function of time, convert 100 Mpc^3 box to Msun Mpc^-3 yr^-1
-        sfr_pts = np.sum(Mform, axis=1) / dt / 100**3
+        # get interpolant for the SFR as as function of time for considered metallicities, convert 100 Mpc^3 box to Msun Mpc^-3 yr^-1
+        valid_met_idxs = np.where((mets >= Zlow) & (mets <= Zhigh))[0]
+        sfr_pts = np.sum(Mform[:,valid_met_idxs], axis=1) / dt / 100**3
         sfr_interp = interp1d(redshifts, sfr_pts)
         # we need to pass some of this Illustris data to fmerge_at_z function
         illustris_data = (redshifts, mets, Mform)
