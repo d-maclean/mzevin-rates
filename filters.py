@@ -13,6 +13,11 @@ def pessimistic_CE(bpp, pessimistic_merge=[0,1,2,7,8,10,11,12]):
     bpp_cut = bpp.drop(np.union1d(CE_merge_star1donor,CE_merge_star2donor))
     return bpp_cut
 
+def mergers(bpp):
+    merger_idxs = bpp.loc[(bpp['evol_type']==6)].index.unique()
+    bpp_cut = bpp.loc[merger_idxs]
+    return bpp_cut
+
 def bbh_filter(bpp):
     bbh_idxs = bpp.loc[(bpp['kstar_1']==14) & (bpp['kstar_2']==14)].index.unique()
     bpp_cut = bpp.loc[bbh_idxs]
@@ -84,6 +89,7 @@ def gw190814_coarse(bpp):
     return bpp_cut
 
 _valid_filters = {'pessimistic_CE': pessimistic_CE, \
+                  'mergers': mergers, \
                   'bbh': bbh_filter, \
                   'nsbh': nsbh_filter, \
                   'bns': bns_filter, \

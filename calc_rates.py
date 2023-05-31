@@ -51,6 +51,7 @@ if args.verbose:
     print("Reading population models...\n")
 if args.cosmic:
     met_files = os.listdir(mdl_path)
+    met_files = [x for x in sorted(met_files) if '0.' in x]
     # process different CBC populations
     for met_file in tqdm(met_files):
         cosmic_files = os.listdir(os.path.join(mdl_path,met_file))
@@ -67,6 +68,9 @@ if args.cosmic:
 
         # read in bpp array
         bpp = pd.read_hdf(os.path.join(mdl_path,met_file,dat_file), key='bpp')
+
+        # filter to get only things that merge
+        bpp = filters.mergers(bpp)
 
         # filter to get pessimistic CE, if specified
         if args.pessimistic:
