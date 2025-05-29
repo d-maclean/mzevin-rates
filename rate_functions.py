@@ -165,7 +165,7 @@ def fmerge_at_z(model, zbin_low, zbin_high, zmerge_max, Zlow, Zhigh, sigmaZ, met
             Nmerge_zbin = len(merger.loc[(merger['t_delay']<=tdelay_max) & (merger['t_delay']>tdelay_min)])
 
         # get birth times
-        t_birth_for_met = midt.value - (merger_df.tphys * u.Myr)
+        t_birth_for_met = midt - (merger_df.tphys * u.Myr)
         z_birth_for_met= np.interp(t_birth_for_met, tvals_for_interp, zvals_for_interp)
         zform_lists.append(z_birth_for_met)
         
