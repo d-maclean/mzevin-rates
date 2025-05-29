@@ -64,15 +64,15 @@ if args.cosmic:
         # get metallicity for this COSMIC run
         initC = pd.read_hdf(dat_file, key='initCond')
         assert len(np.unique(initC['metallicity'])) == 1
-        met = float(initC['metallicity'].loc[0])
+        met = float(initC['metallicity'].iloc[0])
         model[met] = {}
 
         # get total stellar mass sampled
         try:
-            model[met]['mass_stars'] = float(pd.read_hdf(dat_file, key='mass_stars').loc[-1])
+            model[met]['mass_stars'] = float(pd.read_hdf(dat_file, key='mass_stars').iloc[-1])
         except:
-            model[met]['mass_stars'] = float(pd.read_hdf(dat_file, key='mass_singles').loc[-1]) + \
-                float(pd.read_hdf(dat_file, key='mass_binaries').loc[-1])
+            model[met]['mass_stars'] = float(pd.read_hdf(dat_file, key='mass_singles').iloc[-1]) + \
+                float(pd.read_hdf(dat_file, key='mass_binaries').iloc[-1])
 
         # read in bpp array
         bpp = pd.read_hdf(dat_file, key='bpp')
