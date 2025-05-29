@@ -54,7 +54,7 @@ if args.cosmic:
     #met_files = os.listdir(mdl_path)
     #met_files = [x for x in sorted(met_files) if '0.' in x]
     # process different CBC populations
-    met_files = [f for f in glob(f"{mdl_path}") if (f.endswith("hdf5") or f.endswith('h5'))]
+    met_files = [f for f in glob(f"{mdl_path}/*") if f.endswith("h5") or f.endswith(("hdf5"))]
     
     for met_file in tqdm(met_files):
         
