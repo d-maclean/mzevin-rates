@@ -5,6 +5,7 @@ import os
 import pdb
 import argparse
 from tqdm import tqdm
+from glob import glob
 
 import rate_functions
 import filters
@@ -50,24 +51,31 @@ model = {}
 if args.verbose:
     print("Reading population models...\n")
 if args.cosmic:
-    met_files = os.listdir(mdl_path)
-    met_files = [x for x in sorted(met_files) if '0.' in x]
+    #met_files = os.listdir(mdl_path)
+    #met_files = [x for x in sorted(met_files) if '0.' in x]
     # process different CBC populations
+    met_files = [f for f in glob(f"{mdl_path}") if (f.endswith("hdf5") or f.endswith('h5'))]
+    
     for met_file in tqdm(met_files):
-        cosmic_files = os.listdir(os.path.join(mdl_path,met_file))
-        dat_file = [item for item in cosmic_files if (item.startswith('dat')) and (item.endswith('.h5'))][0]
+        
+        #cosmic_files = os.listdir(os.path.join(mdl_path,met_file))
+        dat_file = met_file #[item for item in cosmic_files if (item.startswith('dat')) and (item.endswith('.h5'))][0]
 
         # get metallicity for this COSMIC run
-        initC = pd.read_hdf(os.path.join(mdl_path,met_file,dat_file), key='initCond')
+        initC = pd.read_hdf(dat_file, key='initCond')
         assert len(np.unique(initC['metallicity'])) == 1
-        met = float(initC['metallicity'].iloc[0])
+        met = float(initC['metallicity'].loc[0])
         model[met] = {}
 
         # get total stellar mass sampled
-        model[met]['mass_stars'] = float(pd.read_hdf(os.path.join(mdl_path,met_file,dat_file), key='mass_stars').iloc[-1])
+        try:
+            model[met]['mass_stars'] = float(pd.read_hdf(dat_file, key='mass_stars').loc[-1])
+        except:
+            model[met]['mass_stars'] = float(pd.read_hdf(dat_file, key='mass_singles').loc[-1]) + \
+                float(pd.read_hdf(dat_file, key='mass_binaries').loc[-1])
 
         # read in bpp array
-        bpp = pd.read_hdf(os.path.join(mdl_path,met_file,dat_file), key='bpp')
+        bpp = pd.read_hdf(dat_file, key='bpp')
 
         # filter to get only things that merge
         bpp = filters.mergers(bpp)
