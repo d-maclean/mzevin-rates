@@ -108,6 +108,11 @@ def fmerge_at_z(model, zbin_low, zbin_high, zmerge_max, Zlow, Zhigh, sigmaZ, met
 
     f_merge = []
     met_cdfs = []
+    extra_model_data: list[tuple] = [] # list to hold birth time of each system merging in the bin & the metal weights
+    zform_lists: list = []
+    
+    tvals_for_interp = np.logspace(np.log10(200), np.log10(13700), 500) * u.Myr
+    zvals_for_interp = z_at_value(cosmo.age, tvals_for_interp)
 
     # get the minimum and maximum lookback times for this redshift
     if zbin_low==0:
@@ -121,6 +126,7 @@ def fmerge_at_z(model, zbin_low, zbin_high, zmerge_max, Zlow, Zhigh, sigmaZ, met
     
     # redshift in the middle of this log-spaced interval
     midz = 10**(np.log10(zbin_low) + (np.log10(zbin_high)-np.log10(zbin_low))/2.0)
+    midt = cosmo.age(midz).to(u.Myr)
 
     # relavent probability density function at this redshift
     if met_disp_method=='truncnorm':
@@ -143,7 +149,6 @@ def fmerge_at_z(model, zbin_low, zbin_high, zmerge_max, Zlow, Zhigh, sigmaZ, met
             Z_dist_cdf_interp = interp1d(np.log10(Z[valid_met_idxs]), Z_dist_cdf, fill_value="extrapolate")
 
     for met in sorted(model.keys()):
-
         mass_stars = model[met]['mass_stars']
         if cosmic:
             bpp = model[met][cbc_type]
@@ -154,10 +159,16 @@ def fmerge_at_z(model, zbin_low, zbin_high, zmerge_max, Zlow, Zhigh, sigmaZ, met
 
         # get the fraction of systems born between [zlow,zhigh] that merger between [0,zmerge_max]
         if cosmic:
-            Nmerge_zbin = len(merger.loc[(merger['tphys']<=tdelay_max) & (merger['tphys']>tdelay_min)])
+            merger_df = merger.loc[(merger['tphys']<=tdelay_max) & (merger['tphys']>tdelay_min)]
+            Nmerge_zbin = len(merger_df)
         else:
             Nmerge_zbin = len(merger.loc[(merger['t_delay']<=tdelay_max) & (merger['t_delay']>tdelay_min)])
 
+        # get birth times
+        t_birth_for_met = midt.value - (merger_df.tphys * u.Myr)
+        z_birth_for_met= np.interp(t_birth_for_met, tvals_for_interp, zvals_for_interp)
+        zform_lists.append(z_birth_for_met)
+        
         # get the number of mergers per unit mass
         f_merge.append(float(Nmerge_zbin) / mass_stars)
 
@@ -172,19 +183,23 @@ def fmerge_at_z(model, zbin_low, zbin_high, zmerge_max, Zlow, Zhigh, sigmaZ, met
     # get the weight of each metallicity model at this redshift by taking the midpoints
     # between all cdf values, with the lowest and highest metallicities getting the weight
     # up to Zlow and Zhigh, respectively
+        
     if met_cdfs is not None:
         met_cdfs = np.asarray(met_cdfs)
         cdf_midpts = met_cdfs[:-1] + (met_cdfs[1:]-met_cdfs[:-1])/2
         met_cdf_ranges = np.append(np.append(0, cdf_midpts), 1)
         met_weights = met_cdf_ranges[1:] - met_cdf_ranges[:-1]
 
+
         # metallicity weights should sum to unity (to numerical precision)
         assert ((np.sum(met_weights) > 0.9999) and (np.sum(met_weights) < 1.0001)), "The weights for the metallicities at redshift z={:0.2f} do not sum to unity (they sum to {:0.5f})!".format(midz, np.sum(met_weights))
     else:
         met_weights = 0.0
 
+    for i in range(len(zform_lists)): # collect the extra data
+        extra_model_data.append((zform_lists[i], met_weights[i]))
     # return weighted sum of f_merge, units of Msun**-1
-    return np.sum(np.asarray(f_merge)*met_weights)*u.Msun**(-1)
+    return (np.sum(np.asarray(f_merge)*met_weights)*u.Msun**(-1), extra_model_data)
 
 
 def local_rate(model, zgrid_min, zgrid_max, zmerge_max, Nzbins, Zlow, Zhigh, sigmaZ, met_disp_method, Zsun=0.017, cbc_type=None, cosmic=False):
@@ -244,10 +259,18 @@ def local_rate(model, zgrid_min, zgrid_max, zmerge_max, Nzbins, Zlow, Zhigh, sig
         raise NameError("The metallicity dispersion method you provided ({}) is not defined!".format(met_disp_method))
 
 
+    # TRY THIS AGAIN
+    floc_at_z = []
+    model_data_at_z = []
+    E_z = []
+
+    # get the midpoints of the bins to return
+    midz = 10**(np.log10(zbins[:-1]) + (np.log10(zbins[1:])-np.log10(zbins[:-1]))/2.0)
+
     # work down from highest zbin
     for zbin_low, zbin_high in tqdm(zip(zbins[::-1][1:], zbins[::-1][:-1]), total=len(zbins)-1):
         # get local mergers per unit mass
-        floc = fmerge_at_z(model, zbin_low, zbin_high, zmerge_max, Zlow, Zhigh, \
+        floc, extra_data = fmerge_at_z(model, zbin_low, zbin_high, zmerge_max, Zlow, Zhigh, \
                     sigmaZ, met_disp_method, Zsun, cbc_type, cosmic, \
                     corrected_mean_interp=corrected_mean_interp, extra_data=illustris_data)
         # get redshift at middle of the log-spaced zbin
@@ -256,19 +279,59 @@ def local_rate(model, zgrid_min, zgrid_max, zmerge_max, Nzbins, Zlow, Zhigh, sig
         if met_disp_method=='illustris':
             sfr = sfr_interp(midz) * u.M_sun * u.Mpc**(-3) * u.yr**(-1)
         else:
-            sfr = sfr_z(midz) * u.M_sun * u.Mpc**(-3) * u.yr**(-1)
+            model_data_at_z.append(extra_data)
+            #sfr = sfr_z(midz) * u.M_sun * u.Mpc**(-3) * u.yr**(-1)
+            # alternative SFR method - multiply 
+            
         # cosmological factor
-        E_z = (cosmo._Onu0*(1+midz)**4 + cosmo._Om0*(1+midz)**3 + cosmo._Ok0*(1+midz)**2 + cosmo._Ode0)**(1./2)
+        E_z.append(\
+            (cosmo._Onu0*(1+midz)**4 + cosmo._Om0*(1+midz)**3 + cosmo._Ok0*(1+midz)**2 + cosmo._Ode0)**(1./2)
+            )
         # add the contribution from this zbin to the sum
-        zbin_contribution.append(((sfr*floc / ((1+midz) * E_z)) * (zbin_high-zbin_low)).value)
+        #zbin_contribution.append(((sfr*floc / ((1+midz) * E_z)) * (zbin_high-zbin_low)).value)
 
+    weights_per_metal = []
+    for j in range(len(model)):
+        ack = [x[1][j] for x in model_data_at_z]
+        weights_per_metal.append(ack)
+
+    i = 0
+    for zbin_low, zbin_high in tqdm(zip(zbins[::-1][1:], zbins[::-1][:-1]), total=len(zbins)-1):
+        
+        midz_i = midz[i]
+        extra_data = model_data_at_z[i]
+        sfr_per_system = np.zeros(0)
+        
+        sfr = np.zeros(shape=0)
+        for j in range(len(extra_data)):
+            z_form = extra_data[0]
+            Zweight = get_met_weights_as_z(z_form, midz, weights_per_metal[j])
+            helpme = sfr_z(z_form, mdl='2017')
+            
+            sfr_per_system_at_this_Z = helpme * Zweight
+            sfr_per_system = np.concat([sfr_per_system, sfr_per_system_at_this_Z])
+            
+        zbin_contribution.append(\
+            ((sfr_per_system*floc / ((1+midz_i) * E_z)) * (zbin_high-zbin_low)).value)
+        
+        i += 1
+        
     # reintroduce units to the list
     zbin_contribution = np.asarray(zbin_contribution) * u.Mpc**-3 * u.yr**-1
     # get the total contribution for all zbins and local rate
     zbin_summation = np.sum(zbin_contribution).to(u.Gpc**-3 * u.yr**-1)
     R_local = ((1.0/(cosmo._H0*cosmo.lookback_time(zmerge_max))) * zbin_summation).to(u.Gpc**-3  * u.yr**-1)
 
-    # get the midpoints of the bins to return
-    midz = 10**(np.log10(zbins[:-1]) + (np.log10(zbins[1:])-np.log10(zbins[:-1]))/2.0)
 
     return R_local, zbin_contribution, midz
+
+def get_met_weights_as_z(z, zrange, weights):
+    '''
+    As the end of days, the beast will rise from the sea. Upon its shoulders will be seven heads,
+    and upon its seven heads will rest ten horns and ten crowns, and it will bear the name of blasphemy.
+    ### Parameters:
+    z - array[float]
+    zrange - array[float]
+    '''
+    z_idx = np.argmin(np.abs(z - zrange))
+    return weights[z_idx]
